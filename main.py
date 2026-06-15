@@ -25,8 +25,7 @@ start_time = datetime.datetime.now()
 def get_main_inline_keyboard():
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton('📞 بحث برقم الهاتف', callback_data='search_phone'))
-    markup.row(
-        types.InlineKeyboardButton('📧 بحث ايميل', callback_data='search_email'))
+    markup.row(types.InlineKeyboardButton('📧 بحث ايميل', callback_data='search_email'))
     markup.row(
         types.InlineKeyboardButton('👨‍💻 المطور', url='https://t.me/e77_ee'),
         types.InlineKeyboardButton('❓ المساعدة', callback_data='show_help_menu')
