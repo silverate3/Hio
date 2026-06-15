@@ -706,7 +706,7 @@ def cb_help(call):
               "   <code>example@gmail.com</code>\n\n"
               "🌐 <b>موقع:</b>\n"
               "   <code>google.com</code>\n\n"
-              "👨‍💻 للتواصل: @BBBBYB2"),
+              "👨‍💻 للتواصل: @e77_ee"),
         reply_markup=get_back_keyboard())
     bot.answer_callback_query(call.id)
 
