@@ -30,8 +30,8 @@ def get_main_inline_keyboard():
         types.InlineKeyboardButton('🎵 تيك توك', callback_data='search_tiktok')
     )
     markup.row(
-        types.InlineKeyboardButton('👻 سناب شات', callback_data='search_snapchat'),
-        types.InlineKeyboardButton('🐦 تويتر/X', callback_data='search_twitter')
+        types.InlineKeyboardButton('📧 بحث ايميل', callback_data='search_email'),
+        types.InlineKeyboardButton('🌐 معلومات موقع', callback_data='search_domain')
     )
     markup.row(
         types.InlineKeyboardButton('👨‍💻 المطور', url='https://t.me/BBBBYB2'),
@@ -47,7 +47,7 @@ def get_back_keyboard():
 def get_result_keyboard(url=None):
     markup = types.InlineKeyboardMarkup()
     if url:
-        markup.add(types.InlineKeyboardButton('🔗 فتح الحساب', url=url))
+        markup.add(types.InlineKeyboardButton('🔗 فتح', url=url))
     markup.add(types.InlineKeyboardButton('🔙 رجوع', callback_data='back_to_main_menu'))
     return markup
 
@@ -87,39 +87,37 @@ def check_user_subscription(user_id):
             return False, channel_info
     return True, None
 
-def get_country_from_code(phone_number):
+def normalize_iraq_phone(phone):
+    """تحويل أرقام العراق لتنسيق دولي"""
+    phone = phone.strip().replace(' ', '').replace('-', '')
+    # إذا بدأ بـ 07 أو 7 (عراقي)
+    if phone.startswith('07') and len(phone) == 11:
+        return '+964' + phone[1:]
+    if phone.startswith('7') and len(phone) == 10:
+        return '+964' + phone
+    if phone.startswith('009647'):
+        return '+' + phone[2:]
+    if phone.startswith('9647') and len(phone) >= 12:
+        return '+' + phone
+    # إذا كان مكتمل بالرمز الدولي
+    if phone.startswith('+'):
+        return phone
+    return None
+
+def get_country_from_code(phone):
     codes = {
         '+966': '🇸🇦 السعودية', '+971': '🇦🇪 الإمارات', '+964': '🇮🇶 العراق',
         '+965': '🇰🇼 الكويت', '+974': '🇶🇦 قطر', '+973': '🇧🇭 البحرين',
         '+968': '🇴🇲 عُمان', '+967': '🇾🇪 اليمن', '+20': '🇪🇬 مصر',
         '+212': '🇲🇦 المغرب', '+213': '🇩🇿 الجزائر', '+216': '🇹🇳 تونس',
-        '+218': '🇱🇾 ليبيا', '+249': '🇸🇩 السودان', '+963': '🇸🇾 سوريا',
-        '+961': '🇱🇧 لبنان', '+962': '🇯🇴 الأردن', '+98': '🇮🇷 إيران',
-        '+90': '🇹🇷 تركيا', '+1': '🇺🇸 أمريكا', '+44': '🇬🇧 بريطانيا',
-        '+7': '🇷🇺 روسيا', '+91': '🇮🇳 الهند', '+86': '🇨🇳 الصين',
+        '+218': '🇱🇾 ليبيا', '+963': '🇸🇾 سوريا', '+961': '🇱🇧 لبنان',
+        '+98': '🇮🇷 إيران', '+90': '🇹🇷 تركيا', '+1': '🇺🇸 أمريكا',
+        '+44': '🇬🇧 بريطانيا', '+7': '🇷🇺 روسيا',
     }
     for code, country in sorted(codes.items(), key=lambda x: -len(x[0])):
-        if phone_number.startswith(code):
+        if phone.startswith(code):
             return country
     return '🌍 غير محدد'
-
-def animated_welcome(chat_id, user_name, markup):
-    frames = ["🌑 جاري تحميل البوت...", "🌒 جاري تحميل البوت...",
-              "🌓 جاري تحميل البوت...", "🌔 جاري تحميل البوت...", "🌕 اكتمل! ✨"]
-    try:
-        msg = bot.send_message(chat_id, frames[0])
-        for frame in frames[1:]:
-            time.sleep(0.6)
-            bot.edit_message_text(chat_id=chat_id, message_id=msg.message_id, text=frame)
-        time.sleep(0.5)
-        bot.edit_message_text(
-            chat_id=chat_id, message_id=msg.message_id,
-            text=(f"🎉 <b>أهلاً {user_name}!</b>\n\n"
-                  f"🔍 اختر نوع البحث من القائمة أدناه 👇"),
-            reply_markup=markup
-        )
-    except Exception:
-        pass
 
 # ==================== دالة البحث مع الانيميشن ====================
 
@@ -128,9 +126,13 @@ def run_search(chat_id, user_id, search_func, format_func, wait_text):
     stop_anim = threading.Event()
 
     def animate():
-        frames = ["🔍 <b>جاري البحث .</b>", "🔍 <b>جاري البحث ..</b>",
-                  "🔍 <b>جاري البحث ...</b>", "📡 <b>جاري الاتصال...</b>",
-                  "🔎 <b>تحليل البيانات...</b>"]
+        frames = [
+            "🔍 <b>جاري البحث .</b>",
+            "🔍 <b>جاري البحث ..</b>",
+            "🔍 <b>جاري البحث ...</b>",
+            "📡 <b>جاري الاتصال...</b>",
+            "🔎 <b>تحليل البيانات...</b>",
+        ]
         i = 0
         while not stop_anim.is_set():
             time.sleep(0.9)
@@ -157,7 +159,7 @@ def run_search(chat_id, user_id, search_func, format_func, wait_text):
         time.sleep(0.3)
         try:
             bot.edit_message_text(chat_id=chat_id, message_id=waiting_msg.message_id,
-                                  text="❌ <b>حدث خطأ، حاول مرة أخرى.</b>", reply_markup=get_back_keyboard())
+                text="❌ <b>حدث خطأ، حاول مرة أخرى.</b>", reply_markup=get_back_keyboard())
         except Exception:
             pass
     finally:
@@ -171,7 +173,6 @@ def search_phone_number(phone):
     carrier = None
     line_type = None
 
-    # Caller API
     try:
         r = requests.post(
             "https://caller-uegx.vercel.app/api/v1/search",
@@ -187,116 +188,84 @@ def search_phone_number(phone):
     except Exception:
         pass
 
-    # NumLookup API (مجاني بدون مفتاح)
-    try:
-        clean = phone.replace('+', '').replace(' ', '')
-        r2 = requests.get(
-            f"https://www.numlookup.com/api/lookup?apikey=free&number={clean}",
-            headers={'User-Agent': 'Mozilla/5.0'},
-            timeout=8
-        )
-        if r2.status_code == 200:
-            d2 = r2.json()
-            if not name:
-                name = d2.get('name') or d2.get('caller_name')
-            carrier = d2.get('carrier') or d2.get('operator')
-            line_type = d2.get('line_type') or d2.get('type')
-    except Exception:
-        pass
-
     return {'name': name, 'carrier': carrier, 'line_type': line_type}
 
-# ==================== خدمة 2: انستقرام (RapidAPI مجاني) ====================
+# ==================== خدمة 2: انستقرام ====================
 
 def search_instagram(username):
     username = username.strip().lstrip('@')
 
-    # محاولة 1: Instagram oEmbed API (رسمي ومجاني)
+    sessions = [
+        {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'x-ig-app-id': '936619743392459',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': f'https://www.instagram.com/{username}/',
+            'Origin': 'https://www.instagram.com',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+        },
+        {
+            'User-Agent': 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)',
+            'x-ig-app-id': '567067343352427',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US',
+        }
+    ]
+
+    for headers in sessions:
+        try:
+            r = requests.get(
+                f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
+                headers=headers,
+                timeout=12
+            )
+            if r.status_code == 200:
+                d = r.json()
+                u = d.get('data', {}).get('user', {})
+                if u and u.get('id'):
+                    return {
+                        'full_name': u.get('full_name') or username,
+                        'username': u.get('username', username),
+                        'bio': (u.get('biography') or 'لا يوجد')[:200],
+                        'followers': f"{u.get('edge_followed_by', {}).get('count', 0):,}",
+                        'following': f"{u.get('edge_follow', {}).get('count', 0):,}",
+                        'posts': f"{u.get('edge_owner_to_timeline_media', {}).get('count', 0):,}",
+                        'is_private': '🔒 خاص' if u.get('is_private') else '🌐 عام',
+                        'is_verified': '✅ موثق' if u.get('is_verified') else '❌ غير موثق',
+                        'category': u.get('category_name') or '',
+                        'external_url': u.get('external_url') or '',
+                    }
+        except Exception:
+            continue
+
+    # محاولة Picuki
     try:
         r = requests.get(
-            f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
-            headers={
-                'User-Agent': 'Instagram 155.0.0.37.107',
-                'Accept': '*/*',
-                'Accept-Language': 'en-US',
-                'x-ig-app-id': '936619743392459',
-                'x-asbd-id': '198387',
-                'x-ig-www-claim': '0',
-                'origin': 'https://www.instagram.com',
-                'referer': f'https://www.instagram.com/{username}/',
-            },
+            f"https://www.picuki.com/profile/{username}",
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'},
             timeout=10
         )
         if r.status_code == 200:
-            d = r.json()
-            u = d.get('data', {}).get('user', {})
-            if u:
+            text = r.text
+            name_m = re.search(r'<h1[^>]*>([^<]+)<', text)
+            followers_m = re.search(r'([\d,]+)\s*Followers', text)
+            following_m = re.search(r'([\d,]+)\s*Following', text)
+            posts_m = re.search(r'([\d,]+)\s*Posts', text)
+            if name_m:
                 return {
-                    'full_name': u.get('full_name') or 'غير محدد',
-                    'username': u.get('username', username),
-                    'bio': (u.get('biography') or 'لا يوجد')[:150],
-                    'followers': f"{u.get('edge_followed_by', {}).get('count', 0):,}",
-                    'following': f"{u.get('edge_follow', {}).get('count', 0):,}",
-                    'posts': f"{u.get('edge_owner_to_timeline_media', {}).get('count', 0):,}",
-                    'is_private': '🔒 خاص' if u.get('is_private') else '🌐 عام',
-                    'is_verified': '✅ موثق' if u.get('is_verified') else '❌ غير موثق',
-                }
-    except Exception:
-        pass
-
-    # محاولة 2: Picuki (موقع بديل يعرض معلومات انستقرام)
-    try:
-        r2 = requests.get(
-            f"https://www.picuki.com/profile/{username}",
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
-            timeout=10
-        )
-        if r2.status_code == 200:
-            text = r2.text
-            name_m = re.search(r'<h1[^>]*class="[^"]*profile-name[^"]*"[^>]*>([^<]+)<', text)
-            followers_m = re.search(r'(\d[\d,.]+)\s*[Ff]ollowers', text)
-            following_m = re.search(r'(\d[\d,.]+)\s*[Ff]ollowing', text)
-            posts_m = re.search(r'(\d[\d,.]+)\s*[Pp]osts', text)
-            if name_m or followers_m:
-                return {
-                    'full_name': name_m.group(1).strip() if name_m else username,
+                    'full_name': name_m.group(1).strip(),
                     'username': username,
-                    'bio': 'غير متاح',
+                    'bio': '',
                     'followers': followers_m.group(1) if followers_m else 'غير محدد',
                     'following': following_m.group(1) if following_m else 'غير محدد',
                     'posts': posts_m.group(1) if posts_m else 'غير محدد',
-                    'is_private': '❓ غير محدد',
-                    'is_verified': '❓ غير محدد',
-                }
-    except Exception:
-        pass
-
-    # محاولة 3: Imginn
-    try:
-        r3 = requests.get(
-            f"https://imginn.com/{username}/",
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
-            timeout=10
-        )
-        if r3.status_code == 200:
-            text = r3.text
-            name_m = re.search(r'<div class="name">([^<]+)<', text)
-            followers_m = re.search(r'<span>([\d,.KkMm]+)</span>\s*[Ff]ollowers', text)
-            following_m = re.search(r'<span>([\d,.KkMm]+)</span>\s*[Ff]ollowing', text)
-            posts_m = re.search(r'<span>([\d,.KkMm]+)</span>\s*[Pp]osts', text)
-            if name_m or followers_m:
-                return {
-                    'full_name': name_m.group(1).strip() if name_m else username,
-                    'username': username,
-                    'bio': 'غير متاح',
-                    'followers': followers_m.group(1) if followers_m else 'غير محدد',
-                    'following': following_m.group(1) if following_m else 'غير محدد',
-                    'posts': posts_m.group(1) if posts_m else 'غير محدد',
-                    'is_private': '❓ غير محدد',
-                    'is_verified': '❓ غير محدد',
+                    'is_private': '❓',
+                    'is_verified': '❓',
+                    'category': '',
+                    'external_url': '',
                 }
     except Exception:
         pass
@@ -308,7 +277,6 @@ def search_instagram(username):
 def search_tiktok(username):
     username = username.strip().lstrip('@')
 
-    # محاولة 1: TikTok oEmbed
     try:
         r = requests.get(
             f"https://www.tiktok.com/oembed?url=https://www.tiktok.com/@{username}",
@@ -317,65 +285,62 @@ def search_tiktok(username):
         )
         if r.status_code == 200:
             d = r.json()
-            author = d.get('author_name') or d.get('author_url', '').split('@')[-1]
-            if author:
-                # نجلب المزيد من المعلومات
-                followers = 'غير محدد'
-                likes = 'غير محدد'
-                videos = 'غير محدد'
-                try:
-                    r2 = requests.get(
-                        f"https://www.tiktok.com/@{username}",
-                        headers={
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Accept-Language': 'en-US,en;q=0.9',
-                        },
-                        timeout=10
-                    )
-                    if r2.status_code == 200:
-                        text = r2.text
-                        f_m = re.search(r'"followerCount":(\d+)', text)
-                        l_m = re.search(r'"heartCount":(\d+)', text)
-                        v_m = re.search(r'"videoCount":(\d+)', text)
-                        nick_m = re.search(r'"nickname":"([^"]+)"', text)
-                        if f_m: followers = f"{int(f_m.group(1)):,}"
-                        if l_m: likes = f"{int(l_m.group(1)):,}"
-                        if v_m: videos = f"{int(v_m.group(1)):,}"
-                        if nick_m: author = nick_m.group(1)
-                except Exception:
-                    pass
-                return {
-                    'nickname': author,
-                    'username': username,
-                    'followers': followers,
-                    'likes': likes,
-                    'videos': videos,
-                    'is_verified': '❓ غير محدد',
-                }
+            author = d.get('author_name', username)
+            followers = likes = videos = 'غير محدد'
+            verified = '❓ غير محدد'
+            try:
+                r2 = requests.get(
+                    f"https://www.tiktok.com/@{username}",
+                    headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                    },
+                    timeout=12
+                )
+                if r2.status_code == 200:
+                    t = r2.text
+                    f_m = re.search(r'"followerCount":(\d+)', t)
+                    l_m = re.search(r'"heartCount":(\d+)', t)
+                    v_m = re.search(r'"videoCount":(\d+)', t)
+                    n_m = re.search(r'"nickname":"([^"]+)"', t)
+                    ver_m = re.search(r'"verified":(true|false)', t)
+                    if f_m: followers = f"{int(f_m.group(1)):,}"
+                    if l_m: likes = f"{int(l_m.group(1)):,}"
+                    if v_m: videos = f"{int(v_m.group(1)):,}"
+                    if n_m: author = n_m.group(1)
+                    if ver_m: verified = '✅ موثق' if ver_m.group(1) == 'true' else '❌ غير موثق'
+            except Exception:
+                pass
+            return {
+                'nickname': author,
+                'username': username,
+                'followers': followers,
+                'likes': likes,
+                'videos': videos,
+                'is_verified': verified,
+            }
     except Exception:
         pass
 
-    # محاولة 2: صفحة TikTok مباشرة
     try:
         r = requests.get(
             f"https://www.tiktok.com/@{username}",
             headers={
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Accept': 'text/html,application/xhtml+xml',
             },
             timeout=12
         )
         if r.status_code == 200:
-            text = r.text
-            nick_m = re.search(r'"nickname":"([^"]+)"', text)
-            f_m = re.search(r'"followerCount":(\d+)', text)
-            l_m = re.search(r'"heartCount":(\d+)', text)
-            v_m = re.search(r'"videoCount":(\d+)', text)
-            ver_m = re.search(r'"verified":(true|false)', text)
-            if nick_m or f_m:
+            t = r.text
+            n_m = re.search(r'"nickname":"([^"]+)"', t)
+            f_m = re.search(r'"followerCount":(\d+)', t)
+            l_m = re.search(r'"heartCount":(\d+)', t)
+            v_m = re.search(r'"videoCount":(\d+)', t)
+            ver_m = re.search(r'"verified":(true|false)', t)
+            if n_m or f_m:
                 return {
-                    'nickname': nick_m.group(1) if nick_m else username,
+                    'nickname': n_m.group(1) if n_m else username,
                     'username': username,
                     'followers': f"{int(f_m.group(1)):,}" if f_m else 'غير محدد',
                     'likes': f"{int(l_m.group(1)):,}" if l_m else 'غير محدد',
@@ -387,159 +352,141 @@ def search_tiktok(username):
 
     return None
 
-# ==================== خدمة 4: سناب شات ====================
+# ==================== خدمة 4: بحث الايميل ====================
 
-def search_snapchat(username):
-    username = username.strip().lstrip('@')
+def search_email(email):
+    email = email.strip().lower()
+    results = {'email': email, 'valid': False, 'domain': '', 'mx': False,
+               'disposable': False, 'free': False, 'accounts': []}
 
-    # محاولة 1: Snapchat Public Profiles API
+    # التحقق من صيغة الايميل
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        return None
+
+    domain = email.split('@')[1]
+    results['domain'] = domain
+    results['valid'] = True
+
+    # التحقق من الدومين
+    free_providers = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
+                      'icloud.com', 'protonmail.com', 'mail.com', 'aol.com',
+                      'yandex.com', 'gmx.com']
+    disposable = ['tempmail.com', 'guerrillamail.com', 'mailinator.com',
+                  'throwam.com', '10minutemail.com', 'yopmail.com']
+
+    results['free'] = domain in free_providers
+    results['disposable'] = domain in disposable
+
+    # API مجاني للتحقق من الايميل
     try:
         r = requests.get(
-            f"https://storysharing.snapchat.com/v1/user/{username}",
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json',
-            },
-            timeout=10
+            f"https://api.hunter.io/v2/email-verifier?email={email}&api_key=free",
+            timeout=8
         )
         if r.status_code == 200:
-            d = r.json()
-            story = d.get('story', {})
-            metadata = story.get('metadata', {})
-            if metadata or story:
-                return {
-                    'display_name': metadata.get('title') or username,
-                    'username': username,
-                    'bio': metadata.get('description') or 'لا يوجد',
-                    'subscribers': 'غير محدد',
-                    'is_verified': '✅ موثق' if metadata.get('is_verified') else '❓ غير محدد',
-                }
+            d = r.json().get('data', {})
+            if d.get('status') == 'valid':
+                results['mx'] = True
     except Exception:
         pass
 
-    # محاولة 2: صفحة الإضافة
+    # البحث عن حسابات مرتبطة
     try:
         r2 = requests.get(
-            f"https://www.snapchat.com/add/{username}",
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            },
-            timeout=10
-        )
-        if r2.status_code == 200:
-            text = r2.text
-            name_m = re.search(r'"displayName"\s*:\s*"([^"]+)"', text)
-            bio_m = re.search(r'"bio"\s*:\s*"([^"]*)"', text)
-            subs_m = re.search(r'"subscriberCount"\s*:\s*(\d+)', text)
-            ver_m = re.search(r'"isVerified"\s*:\s*(true|false)', text)
-
-            if name_m or (r2.status_code == 200 and username.lower() in text.lower()):
-                return {
-                    'display_name': name_m.group(1) if name_m else username,
-                    'username': username,
-                    'bio': bio_m.group(1) if bio_m else 'لا يوجد',
-                    'subscribers': f"{int(subs_m.group(1)):,}" if subs_m else 'غير محدد',
-                    'is_verified': '✅ موثق' if ver_m and ver_m.group(1) == 'true' else '❌ غير موثق',
-                }
-    except Exception:
-        pass
-
-    # محاولة 3: Snapchat Public Profile
-    try:
-        r3 = requests.post(
-            "https://www.snapchat.com/web/public_profile_info",
-            json={"username": username},
+            f"https://haveibeenpwned.com/api/v3/breachedaccount/{email}",
             headers={
                 'User-Agent': 'Mozilla/5.0',
-                'Content-Type': 'application/json',
-                'origin': 'https://www.snapchat.com',
+                'hibp-api-key': 'free'
             },
-            timeout=10
+            timeout=8
         )
-        if r3.status_code == 200:
-            d3 = r3.json()
-            if d3.get('publicProfileInfo'):
-                info = d3['publicProfileInfo']
-                return {
-                    'display_name': info.get('title') or username,
-                    'username': username,
-                    'bio': info.get('description') or 'لا يوجد',
-                    'subscribers': f"{info.get('subscriberCount', 0):,}",
-                    'is_verified': '✅ موثق' if info.get('isVerified') else '❌ غير موثق',
-                }
+        if r2.status_code == 200:
+            breaches = r2.json()
+            results['breaches'] = [b.get('Name') for b in breaches[:5]]
+        else:
+            results['breaches'] = []
+    except Exception:
+        results['breaches'] = []
+
+    # فحص وجود الايميل في بعض المنصات
+    platforms_found = []
+    checks = {
+        'Gravatar': f"https://www.gravatar.com/{__import__('hashlib').md5(email.encode()).hexdigest()}.json",
+    }
+    for platform, url in checks.items():
+        try:
+            r3 = requests.get(url, timeout=5)
+            if r3.status_code == 200:
+                platforms_found.append(platform)
+        except Exception:
+            pass
+
+    results['platforms'] = platforms_found
+    return results
+
+# ==================== خدمة 5: معلومات الدومين/الموقع ====================
+
+def search_domain(domain):
+    domain = domain.strip().lower()
+    domain = domain.replace('https://', '').replace('http://', '').replace('www.', '').split('/')[0]
+
+    result = {'domain': domain, 'ip': None, 'country': None, 'org': None,
+              'registrar': None, 'created': None, 'expires': None,
+              'status': None, 'nameservers': []}
+
+    # معلومات IP
+    try:
+        r = requests.get(f"https://ipapi.co/{domain}/json/", timeout=8)
+        if r.status_code == 200:
+            d = r.json()
+            result['ip'] = d.get('ip')
+            result['country'] = d.get('country_name')
+            result['org'] = d.get('org')
+            result['city'] = d.get('city')
     except Exception:
         pass
 
-    return None
-
-# ==================== خدمة 5: تويتر/X ====================
-
-def search_twitter(username):
-    username = username.strip().lstrip('@')
-
-    # محاولة 1: Nitter (مرآة تويتر مفتوحة المصدر)
-    nitter_instances = [
-        f"https://nitter.privacydev.net/{username}",
-        f"https://nitter.poast.org/{username}",
-        f"https://nitter.1d4.us/{username}",
-    ]
-    for url in nitter_instances:
-        try:
-            r = requests.get(
-                url,
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                },
-                timeout=8
-            )
-            if r.status_code == 200 and 'profile' in r.text.lower():
-                text = r.text
-                name_m = re.search(r'<a class="profile-card-fullname"[^>]*>\s*([^<]+)\s*<', text)
-                username_m = re.search(r'<a class="profile-card-username"[^>]*>\s*(@[^<]+)\s*<', text)
-                bio_m = re.search(r'<p class="profile-bio"[^>]*>(.*?)</p>', text, re.DOTALL)
-                tweets_m = re.search(r'<li[^>]*>\s*<span class="profile-stat-header">Tweets</span>\s*<span[^>]*>([^<]+)<', text)
-                following_m = re.search(r'<li[^>]*>\s*<span class="profile-stat-header">Following</span>\s*<span[^>]*>([^<]+)<', text)
-                followers_m = re.search(r'<li[^>]*>\s*<span class="profile-stat-header">Followers</span>\s*<span[^>]*>([^<]+)<', text)
-                if name_m:
-                    bio_text = re.sub(r'<[^>]+>', '', bio_m.group(1)).strip() if bio_m else 'لا يوجد'
-                    return {
-                        'name': name_m.group(1).strip(),
-                        'username': (username_m.group(1).strip() if username_m else f"@{username}"),
-                        'bio': bio_text[:150],
-                        'tweets': tweets_m.group(1).strip() if tweets_m else 'غير محدد',
-                        'following': following_m.group(1).strip() if following_m else 'غير محدد',
-                        'followers': followers_m.group(1).strip() if followers_m else 'غير محدد',
-                        'is_verified': '❓ غير محدد',
-                    }
-        except Exception:
-            continue
-
-    # محاولة 2: Twitter oEmbed
+    # معلومات WHOIS
     try:
         r2 = requests.get(
-            f"https://publish.twitter.com/oembed?url=https://twitter.com/{username}&omit_script=true",
-            headers={'User-Agent': 'Mozilla/5.0'},
+            f"https://api.whoapi.com/?domain={domain}&r=whois&apikey=free",
             timeout=8
         )
         if r2.status_code == 200:
             d2 = r2.json()
-            author = d2.get('author_name', username)
-            return {
-                'name': author,
-                'username': f"@{username}",
-                'bio': 'غير متاح',
-                'tweets': 'غير محدد',
-                'following': 'غير محدد',
-                'followers': 'غير محدد',
-                'is_verified': '❓ غير محدد',
-            }
+            result['registrar'] = d2.get('registrar')
+            result['created'] = d2.get('date_created')
+            result['expires'] = d2.get('date_expires')
     except Exception:
         pass
 
-    return None
+    # معلومات DNS
+    try:
+        r3 = requests.get(
+            f"https://dns.google/resolve?name={domain}&type=A",
+            timeout=8
+        )
+        if r3.status_code == 200:
+            d3 = r3.json()
+            answers = d3.get('Answer', [])
+            if answers and not result['ip']:
+                result['ip'] = answers[0].get('data')
+    except Exception:
+        pass
+
+    # فحص SSL
+    try:
+        r4 = requests.get(f"https://{domain}", timeout=6, verify=True)
+        result['ssl'] = '✅ يوجد SSL'
+        result['status_code'] = r4.status_code
+    except requests.exceptions.SSLError:
+        result['ssl'] = '❌ SSL غير صالح'
+        result['status_code'] = None
+    except Exception:
+        result['ssl'] = '❓ غير محدد'
+        result['status_code'] = None
+
+    return result if result['ip'] or result['registrar'] else None
 
 # ==================== /start ====================
 
@@ -577,12 +524,9 @@ def handle_start(message):
         user_states[user_id] = 'awaiting_subscription_check'
         return
 
-    if is_new:
-        threading.Thread(target=animated_welcome, args=(message.chat.id, user_name, get_main_inline_keyboard())).start()
-    else:
-        bot.send_message(message.chat.id,
-            f"👋 <b>مرحباً {user_name}!</b>\n\n👇 اختر نوع البحث",
-            reply_markup=get_main_inline_keyboard())
+    bot.send_message(message.chat.id,
+        f"👋 <b>مرحباً {user_name}!</b>\n\n👇 اختر نوع البحث",
+        reply_markup=get_main_inline_keyboard())
     user_states.pop(user_id, None)
 
 # ==================== /admin ====================
@@ -604,51 +548,54 @@ def handle_admin(message):
 
 # ==================== Callbacks البحث ====================
 
-def check_and_set_search_state(call, state, prompt_text):
+def set_search_state(call, state, text):
     user_id = call.from_user.id
     if user_id in banned_users:
         bot.answer_callback_query(call.id, "🚫 أنت محظور!", show_alert=True)
-        return False
+        return
     subscribed, _ = check_user_subscription(user_id)
     if not subscribed:
         bot.answer_callback_query(call.id, "⚠️ يجب الاشتراك أولاً!", show_alert=True)
-        return False
+        return
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                          text=prompt_text, reply_markup=get_back_keyboard())
+                          text=text, reply_markup=get_back_keyboard())
     user_states[user_id] = state
     bot.answer_callback_query(call.id)
-    return True
 
 @bot.callback_query_handler(func=lambda call: call.data == 'search_phone')
-def cb_search_phone(call):
-    check_and_set_search_state(call, 'awaiting_phone',
-        "📞 <b>أرسل رقم الهاتف مع رمز الدولة</b>\n\nمثال: <code>+9647801234567</code>")
+def cb_phone(call):
+    set_search_state(call, 'awaiting_phone',
+        "📞 <b>أرسل رقم الهاتف</b>\n\n"
+        "✅ يمكن إرسال الرقم العراقي مباشرة:\n"
+        "<code>07701234567</code> أو <code>7701234567</code>\n\n"
+        "أو مع رمز الدولة:\n"
+        "<code>+9647701234567</code>")
 
 @bot.callback_query_handler(func=lambda call: call.data == 'search_instagram')
-def cb_search_instagram(call):
-    check_and_set_search_state(call, 'awaiting_instagram',
+def cb_instagram(call):
+    set_search_state(call, 'awaiting_instagram',
         "📸 <b>أرسل اسم مستخدم انستقرام</b>\n\nمثال: <code>cristiano</code>")
 
 @bot.callback_query_handler(func=lambda call: call.data == 'search_tiktok')
-def cb_search_tiktok(call):
-    check_and_set_search_state(call, 'awaiting_tiktok',
+def cb_tiktok(call):
+    set_search_state(call, 'awaiting_tiktok',
         "🎵 <b>أرسل اسم مستخدم تيك توك</b>\n\nمثال: <code>khaby.lame</code>")
 
-@bot.callback_query_handler(func=lambda call: call.data == 'search_snapchat')
-def cb_search_snapchat(call):
-    check_and_set_search_state(call, 'awaiting_snapchat',
-        "👻 <b>أرسل اسم مستخدم سناب شات</b>\n\nمثال: <code>snapchat</code>")
+@bot.callback_query_handler(func=lambda call: call.data == 'search_email')
+def cb_email(call):
+    set_search_state(call, 'awaiting_email',
+        "📧 <b>أرسل الايميل للبحث عنه</b>\n\nمثال: <code>example@gmail.com</code>")
 
-@bot.callback_query_handler(func=lambda call: call.data == 'search_twitter')
-def cb_search_twitter(call):
-    check_and_set_search_state(call, 'awaiting_twitter',
-        "🐦 <b>أرسل اسم مستخدم تويتر/X</b>\n\nمثال: <code>elonmusk</code>")
+@bot.callback_query_handler(func=lambda call: call.data == 'search_domain')
+def cb_domain(call):
+    set_search_state(call, 'awaiting_domain',
+        "🌐 <b>أرسل اسم الموقع أو الدومين</b>\n\nمثال: <code>google.com</code>")
 
 # ==================== معالجة الرسائل ====================
 
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) in [
     'awaiting_phone', 'awaiting_instagram', 'awaiting_tiktok',
-    'awaiting_snapchat', 'awaiting_twitter'
+    'awaiting_email', 'awaiting_domain'
 ])
 def handle_search_input(message):
     user_id = message.from_user.id
@@ -656,34 +603,35 @@ def handle_search_input(message):
     query = message.text.strip()
     user_states[user_id] = 'searching'
 
+    # ==================== الرقم ====================
     if state == 'awaiting_phone':
-        if not query.startswith('+') or len(query) < 7:
-            bot.send_message(message.chat.id, "❌ أرسل الرقم مع رمز الدولة\nمثال: <code>+9647801234567</code>", reply_markup=get_back_keyboard())
+        phone = normalize_iraq_phone(query)
+        if not phone:
+            bot.send_message(message.chat.id,
+                "❌ <b>رقم غير صحيح!</b>\n\n"
+                "أرسل رقم عراقي مثل: <code>07701234567</code>\n"
+                "أو مع رمز الدولة: <code>+9647701234567</code>",
+                reply_markup=get_back_keyboard())
             user_states[user_id] = 'awaiting_phone'
             return
 
-        def search(): return search_phone_number(query)
+        def search(): return search_phone_number(phone)
         def fmt(r):
-            country = get_country_from_code(query)
+            country = get_country_from_code(phone)
             name = r.get('name')
-            carrier = r.get('carrier')
-            line_type = r.get('line_type')
             if name:
                 text = (f"✅ <b>تم العثور على النتيجة!</b>\n{'─'*22}\n"
-                        f"📞 <b>الرقم:</b> <code>{query}</code>\n"
+                        f"📞 <b>الرقم:</b> <code>{phone}</code>\n"
                         f"👤 <b>الاسم:</b> <b>{name}</b>\n"
                         f"🌍 <b>الدولة:</b> {country}\n")
             else:
                 text = (f"⚠️ <b>لم يتم العثور على اسم</b>\n{'─'*22}\n"
-                        f"📞 <b>الرقم:</b> <code>{query}</code>\n"
+                        f"📞 <b>الرقم:</b> <code>{phone}</code>\n"
                         f"🌍 <b>الدولة:</b> {country}\n")
-            if carrier: text += f"📶 <b>الشبكة:</b> {carrier}\n"
-            if line_type:
-                lm = {'mobile': '📱 موبايل', 'landline': '☎️ أرضي', 'voip': '🌐 VoIP'}
-                text += f"📋 <b>نوع الخط:</b> {lm.get(line_type, line_type)}\n"
             return text, get_back_keyboard()
-        threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "📞 <b>جاري البحث عن الرقم...</b>")).start()
+        threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "📞 <b>جاري البحث...</b>")).start()
 
+    # ==================== انستقرام ====================
     elif state == 'awaiting_instagram':
         username = query.lstrip('@')
         def search(): return search_instagram(username)
@@ -691,17 +639,23 @@ def handle_search_input(message):
             if r:
                 text = (f"📸 <b>نتيجة انستقرام</b>\n{'─'*22}\n"
                         f"👤 <b>الاسم:</b> {r['full_name']}\n"
-                        f"🔗 <b>المعرف:</b> @{r['username']}\n"
-                        f"📝 <b>البايو:</b> {r['bio']}\n"
-                        f"👥 <b>المتابعون:</b> {r['followers']}\n"
-                        f"➡️ <b>يتابع:</b> {r['following']}\n"
-                        f"🖼 <b>المنشورات:</b> {r['posts']}\n"
-                        f"🔐 <b>الحساب:</b> {r['is_private']}\n"
-                        f"✅ <b>التوثيق:</b> {r['is_verified']}\n")
+                        f"🔗 <b>المعرف:</b> @{r['username']}\n")
+                if r.get('category'):
+                    text += f"🏷 <b>الفئة:</b> {r['category']}\n"
+                text += (f"📝 <b>البايو:</b> {r['bio'] or 'لا يوجد'}\n"
+                         f"👥 <b>المتابعون:</b> {r['followers']}\n"
+                         f"➡️ <b>يتابع:</b> {r['following']}\n"
+                         f"🖼 <b>المنشورات:</b> {r['posts']}\n"
+                         f"🔐 <b>الحساب:</b> {r['is_private']}\n"
+                         f"✅ <b>التوثيق:</b> {r['is_verified']}\n")
+                if r.get('external_url'):
+                    text += f"🔗 <b>الموقع:</b> {r['external_url']}\n"
                 return text, get_result_keyboard(f"https://instagram.com/{r['username']}")
-            return f"❌ <b>لم يتم العثور على</b> @{username}\n\nتأكد من اسم المستخدم.", get_back_keyboard()
+            return (f"❌ <b>لم يتم العثور على الحساب</b>\n\n"
+                    f"تأكد من اسم المستخدم: <code>@{username}</code>"), get_back_keyboard()
         threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "📸 <b>جاري البحث في انستقرام...</b>")).start()
 
+    # ==================== تيك توك ====================
     elif state == 'awaiting_tiktok':
         username = query.lstrip('@')
         def search(): return search_tiktok(username)
@@ -718,37 +672,55 @@ def handle_search_input(message):
             return f"❌ <b>لم يتم العثور على</b> @{username}", get_back_keyboard()
         threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "🎵 <b>جاري البحث في تيك توك...</b>")).start()
 
-    elif state == 'awaiting_snapchat':
-        username = query.lstrip('@')
-        def search(): return search_snapchat(username)
+    # ==================== ايميل ====================
+    elif state == 'awaiting_email':
+        email = query.lower()
+        def search(): return search_email(email)
         def fmt(r):
-            if r:
-                text = (f"👻 <b>نتيجة سناب شات</b>\n{'─'*22}\n"
-                        f"👤 <b>الاسم:</b> {r['display_name']}\n"
-                        f"🔗 <b>المعرف:</b> {r['username']}\n"
-                        f"📝 <b>البايو:</b> {r['bio']}\n"
-                        f"👥 <b>المشتركون:</b> {r['subscribers']}\n"
-                        f"✅ <b>التوثيق:</b> {r['is_verified']}\n")
-                return text, get_result_keyboard(f"https://snapchat.com/add/{r['username']}")
-            return f"❌ <b>لم يتم العثور على</b> {username}", get_back_keyboard()
-        threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "👻 <b>جاري البحث في سناب شات...</b>")).start()
+            if not r:
+                return "❌ <b>صيغة الايميل غير صحيحة</b>", get_back_keyboard()
+            text = (f"📧 <b>نتيجة فحص الايميل</b>\n{'─'*22}\n"
+                    f"📨 <b>الايميل:</b> <code>{r['email']}</code>\n"
+                    f"🌐 <b>الدومين:</b> {r['domain']}\n"
+                    f"✅ <b>الصيغة:</b> {'صحيحة ✅' if r['valid'] else 'خاطئة ❌'}\n"
+                    f"📮 <b>النوع:</b> {'مجاني' if r['free'] else 'خاص'}\n"
+                    f"🗑 <b>مؤقت:</b> {'نعم ⚠️' if r['disposable'] else 'لا ✅'}\n")
+            if r.get('breaches'):
+                text += f"⚠️ <b>تسريبات:</b> {', '.join(r['breaches'])}\n"
+            elif 'breaches' in r:
+                text += f"🛡 <b>تسريبات:</b> لا يوجد ✅\n"
+            if r.get('platforms'):
+                text += f"🔗 <b>منصات:</b> {', '.join(r['platforms'])}\n"
+            return text, get_back_keyboard()
+        threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "📧 <b>جاري فحص الايميل...</b>")).start()
 
-    elif state == 'awaiting_twitter':
-        username = query.lstrip('@')
-        def search(): return search_twitter(username)
+    # ==================== دومين ====================
+    elif state == 'awaiting_domain':
+        domain = query
+        def search(): return search_domain(domain)
         def fmt(r):
-            if r:
-                text = (f"🐦 <b>نتيجة تويتر/X</b>\n{'─'*22}\n"
-                        f"👤 <b>الاسم:</b> {r['name']}\n"
-                        f"🔗 <b>المعرف:</b> {r['username']}\n"
-                        f"📝 <b>البايو:</b> {r['bio']}\n"
-                        f"👥 <b>المتابعون:</b> {r['followers']}\n"
-                        f"➡️ <b>يتابع:</b> {r['following']}\n"
-                        f"🐦 <b>التغريدات:</b> {r['tweets']}\n"
-                        f"✅ <b>التوثيق:</b> {r['is_verified']}\n")
-                return text, get_result_keyboard(f"https://twitter.com/{username}")
-            return f"❌ <b>لم يتم العثور على</b> @{username}", get_back_keyboard()
-        threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "🐦 <b>جاري البحث في تويتر...</b>")).start()
+            if not r:
+                return f"❌ <b>لم يتم العثور على معلومات</b>\n<code>{domain}</code>", get_back_keyboard()
+            text = (f"🌐 <b>معلومات الموقع</b>\n{'─'*22}\n"
+                    f"🔗 <b>الدومين:</b> <code>{r['domain']}</code>\n")
+            if r.get('ip'):
+                text += f"🖥 <b>الـ IP:</b> <code>{r['ip']}</code>\n"
+            if r.get('country'):
+                text += f"🌍 <b>الدولة:</b> {r['country']}\n"
+            if r.get('city'):
+                text += f"📍 <b>المدينة:</b> {r['city']}\n"
+            if r.get('org'):
+                text += f"🏢 <b>المزود:</b> {r['org']}\n"
+            if r.get('ssl'):
+                text += f"🔒 <b>SSL:</b> {r['ssl']}\n"
+            if r.get('registrar'):
+                text += f"📋 <b>المسجّل:</b> {r['registrar']}\n"
+            if r.get('created'):
+                text += f"📅 <b>تاريخ الإنشاء:</b> {r['created']}\n"
+            if r.get('expires'):
+                text += f"⏳ <b>تاريخ الانتهاء:</b> {r['expires']}\n"
+            return text, get_result_keyboard(f"https://{r['domain']}")
+        threading.Thread(target=run_search, args=(message.chat.id, user_id, search, fmt, "🌐 <b>جاري جلب معلومات الموقع...</b>")).start()
 
 # ==================== Callbacks عامة ====================
 
@@ -756,12 +728,15 @@ def handle_search_input(message):
 def cb_help(call):
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
         text=("❓ <b>كيفية الاستخدام</b>\n\n"
-              "📞 <b>رقم الهاتف:</b> أرسل مع رمز الدولة\n"
-              "   مثال: <code>+9647801234567</code>\n\n"
-              "📸 <b>انستقرام / 🎵 تيك توك\n"
-              "👻 سناب شات / 🐦 تويتر:</b>\n"
-              "   أرسل اسم المستخدم فقط\n"
-              "   مثال: <code>cristiano</code>\n\n"
+              "📞 <b>رقم الهاتف:</b>\n"
+              "   <code>07701234567</code> عراقي مباشر\n"
+              "   <code>+9647701234567</code> مع رمز الدولة\n\n"
+              "📸 <b>انستقرام / 🎵 تيك توك:</b>\n"
+              "   أرسل اسم المستخدم: <code>cristiano</code>\n\n"
+              "📧 <b>ايميل:</b>\n"
+              "   <code>example@gmail.com</code>\n\n"
+              "🌐 <b>موقع:</b>\n"
+              "   <code>google.com</code>\n\n"
               "👨‍💻 للتواصل: @BBBBYB2"),
         reply_markup=get_back_keyboard())
     bot.answer_callback_query(call.id)
@@ -911,11 +886,8 @@ def cb_remove_channel(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('del_ch_') and call.from_user.id == OWNER_ID)
 def cb_del_channel(call):
     cid = int(call.data.replace('del_ch_', ''))
-    if cid in mandatory_channels:
-        del mandatory_channels[cid]
-        text = '✅ تم الحذف.'
-    else:
-        text = '❌ غير موجودة.'
+    text = '✅ تم الحذف.' if cid in mandatory_channels else '❌ غير موجودة.'
+    mandatory_channels.pop(cid, None)
     bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
         text=text, reply_markup=get_admin_channel_management_keyboard())
     bot.answer_callback_query(call.id)
@@ -955,7 +927,6 @@ def process_channel_add(message):
                 bot.send_message(user_id, '❌ لا يمكن الحصول على رابط.', reply_markup=get_admin_channel_management_keyboard())
                 user_states[user_id] = 'admin_channels'
                 return
-
     elif message.text and (message.text.startswith('https://t.me/') or message.text.startswith('@')):
         channel_link = message.text
         try:
