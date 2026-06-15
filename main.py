@@ -99,7 +99,7 @@ def animated_welcome(chat_id, user_name, markup):
             text=(
                 f"🎉 <b>أهلاً وسهلاً {user_name}!</b>\n\n"
                 f"✨ يسعدنا انضمامك لبوت معرفة اسم الرقم\n\n"
-                f"📞 ابحث عن اسم أي رقم هاتف حول العالم بسهولة وسرعة!\n\n"
+                f"📞 ابحث عن اسم أي رقم هاتف حول العالم!\n\n"
                 f"👇 اضغط على البحث للبدء"
             ),
             reply_markup=markup
@@ -107,95 +107,179 @@ def animated_welcome(chat_id, user_name, markup):
     except Exception:
         pass
 
-def search_phone_api1(phone_number):
-    """API الأول - caller"""
-    url = "https://caller-uegx.vercel.app/api/v1/search"
-    payload = {"phone": phone_number}
-    headers = {
-        'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36",
-        'Content-Type': "application/json",
-        'origin': "https://caller-uegx.vercel.app",
-        'referer': "https://caller-uegx.vercel.app/",
-        'accept-language': "ar-IQ,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+def get_country_from_code(phone_number):
+    codes = {
+        '+966': '🇸🇦 السعودية', '+971': '🇦🇪 الإمارات', '+964': '🇮🇶 العراق',
+        '+965': '🇰🇼 الكويت', '+974': '🇶🇦 قطر', '+973': '🇧🇭 البحرين',
+        '+968': '🇴🇲 عُمان', '+967': '🇾🇪 اليمن', '+20': '🇪🇬 مصر',
+        '+212': '🇲🇦 المغرب', '+213': '🇩🇿 الجزائر', '+216': '🇹🇳 تونس',
+        '+218': '🇱🇾 ليبيا', '+249': '🇸🇩 السودان', '+963': '🇸🇾 سوريا',
+        '+961': '🇱🇧 لبنان', '+962': '🇯🇴 الأردن', '+970': '🇵🇸 فلسطين',
+        '+98': '🇮🇷 إيران', '+90': '🇹🇷 تركيا', '+1': '🇺🇸 أمريكا/كندا',
+        '+44': '🇬🇧 المملكة المتحدة', '+49': '🇩🇪 ألمانيا', '+33': '🇫🇷 فرنسا',
+        '+7': '🇷🇺 روسيا', '+91': '🇮🇳 الهند', '+86': '🇨🇳 الصين',
+        '+81': '🇯🇵 اليابان', '+82': '🇰🇷 كوريا الجنوبية', '+55': '🇧🇷 البرازيل',
+        '+52': '🇲🇽 المكسيك', '+27': '🇿🇦 جنوب أفريقيا', '+234': '🇳🇬 نيجيريا',
     }
-    response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
-    response_json = response.json()
-    if response_json and 'results' in response_json and response_json['results']:
-        return response_json['results'][0].get('name', None)
-    return None
+    for code, country in sorted(codes.items(), key=lambda x: -len(x[0])):
+        if phone_number.startswith(code):
+            return country
+    return '🌍 غير محدد'
 
-def search_phone_api2(phone_number):
-    """API الثاني - numverify"""
+# ==================== خدمات البحث الأربع ====================
+
+def search_api_caller(phone_number):
+    """خدمة 1: Caller API"""
     try:
-        clean_number = phone_number.replace('+', '').replace(' ', '')
-        url = f"http://apilayer.net/api/validate?access_key=free&number={clean_number}&country_code=&format=1"
-        response = requests.get(url, timeout=8)
+        url = "https://caller-uegx.vercel.app/api/v1/search"
+        payload = {"phone": phone_number}
+        headers = {
+            'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
+            'Content-Type': "application/json",
+            'origin': "https://caller-uegx.vercel.app",
+            'referer': "https://caller-uegx.vercel.app/",
+        }
+        response = requests.post(url, data=json.dumps(payload), headers=headers, timeout=10)
         data = response.json()
-        if data.get('valid'):
-            country = data.get('country_name', '')
-            location = data.get('location', '')
-            carrier = data.get('carrier', '')
-            line_type = data.get('line_type', '')
-            return None, country, location, carrier, line_type
+        if data and 'results' in data and data['results']:
+            name = data['results'][0].get('name', None)
+            if name and name.lower() not in ['unavailable', 'unknown', '']:
+                return name, 'Caller API'
     except Exception:
         pass
-    return None, None, None, None, None
+    return None, None
 
-def get_phone_info(phone_number):
-    """جلب معلومات الرقم من APIs متعددة"""
-    name = None
-    country = None
-    location = None
-    carrier = None
-
-    # API الأول
+def search_api_sync_me(phone_number):
+    """خدمة 2: Sync.me"""
     try:
-        name = search_phone_api1(phone_number)
+        clean = phone_number.replace('+', '').replace(' ', '').replace('-', '')
+        url = f"https://sync.me/search/?number={clean}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'ar-SA,ar;q=0.9',
+        }
+        response = requests.get(url, headers=headers, timeout=8)
+        if response.status_code == 200:
+            text = response.text
+            if '"name"' in text:
+                import re
+                match = re.search(r'"name"\s*:\s*"([^"]+)"', text)
+                if match:
+                    name = match.group(1)
+                    if name and len(name) > 1:
+                        return name, 'Sync.me'
     except Exception:
         pass
+    return None, None
 
-    # API الثاني للمعلومات الإضافية
+def search_api_phone_lookup(phone_number):
+    """خدمة 3: Phone Lookup - معلومات الشبكة والنوع"""
     try:
         clean = phone_number.replace('+', '').replace(' ', '')
-        # تحديد الدولة من كود الدولة
-        if phone_number.startswith('+966') or phone_number.startswith('966'):
-            country = '🇸🇦 السعودية'
-        elif phone_number.startswith('+971') or phone_number.startswith('971'):
-            country = '🇦🇪 الإمارات'
-        elif phone_number.startswith('+964') or phone_number.startswith('964'):
-            country = '🇮🇶 العراق'
-        elif phone_number.startswith('+965') or phone_number.startswith('965'):
-            country = '🇰🇼 الكويت'
-        elif phone_number.startswith('+974') or phone_number.startswith('974'):
-            country = '🇶🇦 قطر'
-        elif phone_number.startswith('+973') or phone_number.startswith('973'):
-            country = '🇧🇭 البحرين'
-        elif phone_number.startswith('+968') or phone_number.startswith('968'):
-            country = '🇴🇲 عُمان'
-        elif phone_number.startswith('+967') or phone_number.startswith('967'):
-            country = '🇾🇪 اليمن'
-        elif phone_number.startswith('+20') or phone_number.startswith('20'):
-            country = '🇪🇬 مصر'
-        elif phone_number.startswith('+212') or phone_number.startswith('212'):
-            country = '🇲🇦 المغرب'
-        elif phone_number.startswith('+213') or phone_number.startswith('213'):
-            country = '🇩🇿 الجزائر'
-        elif phone_number.startswith('+216') or phone_number.startswith('216'):
-            country = '🇹🇳 تونس'
-        elif phone_number.startswith('+1'):
-            country = '🇺🇸 الولايات المتحدة/كندا'
-        elif phone_number.startswith('+44'):
-            country = '🇬🇧 المملكة المتحدة'
-        elif phone_number.startswith('+90'):
-            country = '🇹🇷 تركيا'
-        elif phone_number.startswith('+98'):
-            country = '🇮🇷 إيران'
-        else:
-            country = '🌍 غير محدد'
+        url = f"https://phonevalidation.abstractapi.com/v1/?api_key=free&phone={clean}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=8)
+        if response.status_code == 200:
+            data = response.json()
+            carrier = None
+            if isinstance(data.get('carrier'), dict):
+                carrier = data['carrier'].get('name')
+            elif isinstance(data.get('carrier'), str):
+                carrier = data['carrier']
+            line_type = data.get('type', None)
+            if carrier or line_type:
+                return carrier, line_type, 'Phone Lookup'
     except Exception:
         pass
+    return None, None, None
 
-    return name, country
+def search_api_hlrlookup(phone_number):
+    """خدمة 4: HLR Lookup - فحص الشبكة الفعلية"""
+    try:
+        clean = phone_number.replace('+', '').replace(' ', '')
+        url = f"https://api.hlrlookups.com/v1/phone?number={clean}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'application/json',
+        }
+        response = requests.get(url, headers=headers, timeout=8)
+        if response.status_code == 200:
+            data = response.json()
+            carrier = data.get('operator', None) or data.get('network', None)
+            status = data.get('status', None)
+            if carrier:
+                return carrier, status, 'HLR Lookup'
+    except Exception:
+        pass
+    return None, None, None
+
+def search_all_apis(phone_number):
+    """البحث في جميع الخدمات الأربع بالتوازي"""
+    results = {
+        'name': None,
+        'carrier': None,
+        'line_type': None,
+        'status': None,
+        'sources': []
+    }
+
+    # تشغيل الخدمات بالتوازي
+    name_result = [None, None]
+    name2_result = [None, None]
+    lookup_result = [None, None, None]
+    hlr_result = [None, None, None]
+
+    def run_api1():
+        name_result[0], name_result[1] = search_api_caller(phone_number)
+
+    def run_api2():
+        name2_result[0], name2_result[1] = search_api_sync_me(phone_number)
+
+    def run_api3():
+        lookup_result[0], lookup_result[1], lookup_result[2] = search_api_phone_lookup(phone_number)
+
+    def run_api4():
+        hlr_result[0], hlr_result[1], hlr_result[2] = search_api_hlrlookup(phone_number)
+
+    threads = [
+        threading.Thread(target=run_api1),
+        threading.Thread(target=run_api2),
+        threading.Thread(target=run_api3),
+        threading.Thread(target=run_api4),
+    ]
+
+    for t in threads:
+        t.daemon = True
+        t.start()
+
+    for t in threads:
+        t.join(timeout=12)
+
+    # جمع النتائج
+    if name_result[0]:
+        results['name'] = name_result[0]
+        results['sources'].append(name_result[1])
+
+    if not results['name'] and name2_result[0]:
+        results['name'] = name2_result[0]
+        results['sources'].append(name2_result[1])
+
+    if lookup_result[0]:
+        results['carrier'] = lookup_result[0]
+    if lookup_result[1]:
+        results['line_type'] = lookup_result[1]
+    if lookup_result[2]:
+        results['sources'].append(lookup_result[2])
+
+    if hlr_result[0] and not results['carrier']:
+        results['carrier'] = hlr_result[0]
+    if hlr_result[1]:
+        results['status'] = hlr_result[1]
+    if hlr_result[2] and hlr_result[0]:
+        results['sources'].append(hlr_result[2])
+
+    return results
 
 # ==================== أمر /start ====================
 
@@ -213,16 +297,16 @@ def handle_start(message):
     if is_new_user:
         bot_users.add(user_id)
         search_counts[user_id] = 0
-        owner_message = (
-            f"📲 <b>مستخدم جديد!</b>\n\n"
-            f"👤 الاسم: {message.from_user.full_name}\n"
-            f"🔗 المعرف: @{message.from_user.username or 'لا يوجد'}\n"
-            f"🆔 الآيدي: <code>{user_id}</code>\n"
-            f"📅 التاريخ: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
-            f"👥 إجمالي المستخدمين: {len(bot_users)}"
-        )
         try:
-            bot.send_message(OWNER_ID, owner_message)
+            bot.send_message(
+                OWNER_ID,
+                f"📲 <b>مستخدم جديد!</b>\n\n"
+                f"👤 الاسم: {message.from_user.full_name}\n"
+                f"🔗 المعرف: @{message.from_user.username or 'لا يوجد'}\n"
+                f"🆔 الآيدي: <code>{user_id}</code>\n"
+                f"📅 التاريخ: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+                f"👥 إجمالي المستخدمين: {len(bot_users)}"
+            )
         except Exception:
             pass
 
@@ -237,7 +321,7 @@ def handle_start(message):
         bot.send_message(
             message.chat.id,
             f"👋 عزيزي <b>{user_name}</b>\n\n"
-            f"⚠️ يجب الاشتراك في القناة أولاً للمتابعة:\n\n"
+            f"⚠️ يجب الاشتراك في القناة أولاً:\n\n"
             f"بعد الاشتراك اضغط <b>تحقق</b> ✅",
             reply_markup=markup
         )
@@ -279,7 +363,7 @@ def handle_admin_command(message):
     )
     user_states[message.from_user.id] = 'admin_panel'
 
-# ==================== البحث عن الرقم ====================
+# ==================== البحث - callback ====================
 
 @bot.callback_query_handler(func=lambda call: call.data == 'search_name')
 def callback_search_name(call):
@@ -302,6 +386,8 @@ def callback_search_name(call):
     user_states[user_id] = 'awaiting_phone_number'
     bot.answer_callback_query(call.id)
 
+# ==================== معالجة الرقم - مُصلح ====================
+
 @bot.message_handler(func=lambda message: user_states.get(message.from_user.id) == 'awaiting_phone_number')
 def process_phone_number(message):
     user_id = message.from_user.id
@@ -310,7 +396,10 @@ def process_phone_number(message):
     if user_id in banned_users:
         return
 
-    if not phone_number.startswith('+') or not phone_number[1:].replace(' ', '').isdigit() or len(phone_number) < 7:
+    # تغيير الحالة فوراً لمنع التكرار
+    user_states[user_id] = 'searching'
+
+    if not phone_number.startswith('+') or len(phone_number) < 7:
         bot.send_message(
             message.chat.id,
             "❌ <b>رقم غير صحيح!</b>\n\n"
@@ -318,51 +407,87 @@ def process_phone_number(message):
             "مثال: <code>+9647801234567</code>",
             reply_markup=get_inline_back_to_main_keyboard()
         )
+        user_states[user_id] = 'awaiting_phone_number'
         return
 
-    # رسالة الانتظار المتحركة
-    frames = ["🔍 جاري البحث .", "🔍 جاري البحث ..", "🔍 جاري البحث ...", "🔎 تحليل البيانات..."]
-    waiting_msg = bot.send_message(message.chat.id, frames[0])
+    # إرسال رسالة الانتظار
+    waiting_msg = bot.send_message(message.chat.id, "🔍 <b>جاري البحث .</b>")
+    stop_animation = threading.Event()
 
-    def animate_search():
-        for i in range(1, 8):
-            time.sleep(0.5)
+    def animate():
+        frames = [
+            "🔍 <b>جاري البحث ..</b>",
+            "🔍 <b>جاري البحث ...</b>",
+            "🔎 <b>تحليل البيانات...</b>",
+            "📡 <b>الاتصال بالخوادم...</b>",
+            "🔍 <b>جاري البحث .</b>",
+        ]
+        i = 0
+        while not stop_animation.is_set():
+            time.sleep(0.8)
+            if stop_animation.is_set():
+                break
             try:
                 bot.edit_message_text(
                     chat_id=message.chat.id,
                     message_id=waiting_msg.message_id,
                     text=frames[i % len(frames)]
                 )
+                i += 1
             except Exception:
                 break
 
-    anim_thread = threading.Thread(target=animate_search)
+    anim_thread = threading.Thread(target=animate)
     anim_thread.daemon = True
     anim_thread.start()
 
     try:
-        name, country = get_phone_info(phone_number)
-
-        # إحصاء عمليات البحث
+        results = search_all_apis(phone_number)
+        country = get_country_from_code(phone_number)
         search_counts[user_id] = search_counts.get(user_id, 0) + 1
 
-        if name and name != 'unavailable':
+        name = results.get('name')
+        carrier = results.get('carrier')
+        line_type = results.get('line_type')
+        status = results.get('status')
+        sources = results.get('sources', [])
+
+        # إيقاف الانيميشن قبل تحديث الرسالة
+        stop_animation.set()
+        time.sleep(0.5)
+
+        if name:
             result_text = (
-                f"✅ <b>تم العثور على النتيجة!</b>\n\n"
+                f"✅ <b>تم العثور على النتيجة!</b>\n"
+                f"{'─' * 22}\n"
                 f"📞 <b>الرقم:</b> <code>{phone_number}</code>\n"
-                f"👤 <b>الاسم:</b> {name}\n"
-                f"🌍 <b>الدولة:</b> {country or 'غير محدد'}\n\n"
-                f"🔢 <i>بحثك رقم {search_counts[user_id]}</i>"
+                f"👤 <b>الاسم:</b> <b>{name}</b>\n"
+                f"🌍 <b>الدولة:</b> {country}\n"
             )
         else:
             result_text = (
-                f"⚠️ <b>لم يتم العثور على اسم</b>\n\n"
+                f"⚠️ <b>لم يتم العثور على اسم</b>\n"
+                f"{'─' * 22}\n"
                 f"📞 <b>الرقم:</b> <code>{phone_number}</code>\n"
-                f"🌍 <b>الدولة:</b> {country or 'غير محدد'}\n\n"
-                f"<i>الرقم غير موجود في قاعدة البيانات</i>"
+                f"🌍 <b>الدولة:</b> {country}\n"
             )
 
-        time.sleep(2)
+        if carrier:
+            result_text += f"📶 <b>الشبكة:</b> {carrier}\n"
+
+        if line_type:
+            line_map = {'mobile': '📱 موبايل', 'landline': '☎️ أرضي', 'voip': '🌐 VoIP', 'fixed_line': '☎️ أرضي'}
+            result_text += f"📋 <b>نوع الخط:</b> {line_map.get(line_type, line_type)}\n"
+
+        if status:
+            result_text += f"📡 <b>الحالة:</b> {status}\n"
+
+        result_text += f"{'─' * 22}\n"
+        result_text += f"🔢 <i>عملية البحث رقم {search_counts[user_id]}</i>"
+
+        if sources:
+            result_text += f"\n📡 <i>المصادر: {', '.join(set(sources))}</i>"
+
         bot.edit_message_text(
             chat_id=message.chat.id,
             message_id=waiting_msg.message_id,
@@ -370,21 +495,20 @@ def process_phone_number(message):
             reply_markup=get_search_result_keyboard()
         )
 
-    except requests.exceptions.RequestException:
-        bot.edit_message_text(
-            chat_id=message.chat.id,
-            message_id=waiting_msg.message_id,
-            text="❌ <b>خطأ في الاتصال بالخادم</b>\n\nحاول مرة أخرى لاحقاً.",
-            reply_markup=get_main_inline_keyboard()
-        )
-    except Exception as e:
-        bot.edit_message_text(
-            chat_id=message.chat.id,
-            message_id=waiting_msg.message_id,
-            text="❌ <b>حدث خطأ غير متوقع</b>\n\nحاول مرة أخرى.",
-            reply_markup=get_main_inline_keyboard()
-        )
+    except Exception:
+        stop_animation.set()
+        time.sleep(0.3)
+        try:
+            bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=waiting_msg.message_id,
+                text="❌ <b>حدث خطأ، حاول مرة أخرى.</b>",
+                reply_markup=get_main_inline_keyboard()
+            )
+        except Exception:
+            pass
     finally:
+        stop_animation.set()
         if user_id in user_states:
             del user_states[user_id]
 
@@ -420,8 +544,13 @@ def callback_show_help(call):
             "2️⃣ أرسل رقم الهاتف مع رمز الدولة\n"
             "   مثال: <code>+9647801234567</code>\n"
             "3️⃣ انتظر النتيجة 🎯\n\n"
-            "⚠️ <b>ملاحظة:</b> إذا لم يظهر اسم فالرقم غير موجود في قاعدة البيانات\n\n"
-            "👨‍💻 للتواصل مع المطور: @BBBBYB2"
+            "📡 <b>الخدمات المستخدمة:</b>\n"
+            "• 1️⃣ Caller API\n"
+            "• 2️⃣ Sync.me\n"
+            "• 3️⃣ Phone Lookup\n"
+            "• 4️⃣ HLR Lookup\n\n"
+            "⚠️ إذا لم يظهر اسم فالرقم غير موجود في قواعد البيانات\n\n"
+            "👨‍💻 للتواصل: @BBBBYB2"
         ),
         reply_markup=get_inline_back_to_main_keyboard()
     )
@@ -435,29 +564,35 @@ def callback_check_sub(call):
     user_name = call.from_user.first_name or call.from_user.username or str(user_id)
     subscribed, channel_to_join = check_user_subscription(user_id)
     if subscribed:
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=f"✅ <b>تم التحقق!</b>\n\nأهلاً {user_name} 🎉",
-            reply_markup=get_main_inline_keyboard()
-        )
+        try:
+            bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=f"✅ <b>تم التحقق!</b>\n\nأهلاً {user_name} 🎉",
+                reply_markup=get_main_inline_keyboard()
+            )
+        except Exception:
+            pass
         if user_id in user_states:
             del user_states[user_id]
+        bot.answer_callback_query(call.id)
     else:
         bot.answer_callback_query(call.id, "❌ لم تشترك بعد!", show_alert=True)
-    bot.answer_callback_query(call.id)
 
 # ==================== الرجوع للقائمة الرئيسية ====================
 
 @bot.callback_query_handler(func=lambda call: call.data == 'back_to_main_menu')
 def callback_back_to_main(call):
     user_name = call.from_user.first_name or call.from_user.username or str(call.from_user.id)
-    bot.edit_message_text(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        text=f"👋 <b>مرحباً {user_name}!</b>\n\n👇 اختر من القائمة",
-        reply_markup=get_main_inline_keyboard()
-    )
+    try:
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=f"👋 <b>مرحباً {user_name}!</b>\n\n👇 اختر من القائمة",
+            reply_markup=get_main_inline_keyboard()
+        )
+    except Exception:
+        pass
     if call.from_user.id in user_states:
         del user_states[call.from_user.id]
     bot.answer_callback_query(call.id)
@@ -490,7 +625,7 @@ def callback_admin_broadcast(call):
     bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        text="📨 <b>أرسل الرسالة التي تريد إرسالها لجميع المستخدمين:</b>",
+        text="📨 <b>أرسل الرسالة الجماعية:</b>",
         reply_markup=get_admin_keyboard()
     )
     user_states[call.from_user.id] = 'awaiting_broadcast_message'
@@ -509,8 +644,7 @@ def process_broadcast(message):
             failed += 1
     bot.send_message(
         message.chat.id,
-        f"✅ <b>تم إرسال الرسالة الجماعية</b>\n\n"
-        f"✅ نجح: {success}\n❌ فشل: {failed}",
+        f"✅ <b>تم إرسال الرسالة الجماعية</b>\n\n✅ نجح: {success}\n❌ فشل: {failed}",
         reply_markup=get_admin_keyboard()
     )
     del user_states[message.from_user.id]
@@ -531,7 +665,7 @@ def process_ban_user(message):
     try:
         target_id = int(message.text.strip())
         banned_users.add(target_id)
-        bot.send_message(message.chat.id, f"✅ تم حظر المستخدم <code>{target_id}</code>", reply_markup=get_admin_keyboard())
+        bot.send_message(message.chat.id, f"✅ تم حظر <code>{target_id}</code>", reply_markup=get_admin_keyboard())
         try:
             bot.send_message(target_id, "🚫 <b>تم حظرك من استخدام البوت.</b>")
         except Exception:
@@ -558,7 +692,7 @@ def process_unban_user(message):
         banned_users.discard(target_id)
         bot.send_message(message.chat.id, f"✅ تم رفع الحظر عن <code>{target_id}</code>", reply_markup=get_admin_keyboard())
         try:
-            bot.send_message(target_id, "✅ <b>تم رفع الحظر عنك، يمكنك استخدام البوت الآن.</b>")
+            bot.send_message(target_id, "✅ <b>تم رفع الحظر عنك!</b>")
         except Exception:
             pass
     except ValueError:
@@ -579,12 +713,15 @@ def callback_admin_manage_channels(call):
 @bot.callback_query_handler(func=lambda call: call.data == 'admin_back_to_user_menu' and call.from_user.id == OWNER_ID)
 def callback_admin_back_to_user_menu(call):
     user_name = call.from_user.first_name or str(call.from_user.id)
-    bot.edit_message_text(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        text=f"👋 <b>مرحباً {user_name}!</b>\n\n👇 اختر من القائمة",
-        reply_markup=get_main_inline_keyboard()
-    )
+    try:
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=f"👋 <b>مرحباً {user_name}!</b>\n\n👇 اختر من القائمة",
+            reply_markup=get_main_inline_keyboard()
+        )
+    except Exception:
+        pass
     if call.from_user.id in user_states:
         del user_states[call.from_user.id]
     bot.answer_callback_query(call.id)
@@ -678,7 +815,7 @@ def process_channel_for_add(message):
                 chat = bot.get_chat(channel_id)
                 channel_link = chat.invite_link
                 if not channel_link:
-                    bot.send_message(user_id, '❌ لا يمكن الحصول على رابط دعوة.', reply_markup=get_admin_channel_management_keyboard())
+                    bot.send_message(user_id, '❌ لا يمكن الحصول على رابط.', reply_markup=get_admin_channel_management_keyboard())
                     user_states[user_id] = 'admin_channel_management'
                     return
             except Exception:
@@ -716,7 +853,7 @@ def process_channel_for_add(message):
         except Exception:
             pass
         mandatory_channels[channel_id] = {'title': channel_title, 'link': channel_link}
-        bot.send_message(user_id, f"✅ تمت إضافة القناة '<b>{channel_title}</b>' بنجاح!", reply_markup=get_admin_channel_management_keyboard())
+        bot.send_message(user_id, f"✅ تمت إضافة '<b>{channel_title}</b>' بنجاح!", reply_markup=get_admin_channel_management_keyboard())
     else:
         bot.send_message(user_id, '❌ حدث خطأ.', reply_markup=get_admin_channel_management_keyboard())
 
@@ -724,5 +861,5 @@ def process_channel_for_add(message):
 
 # ==================== تشغيل البوت ====================
 
-print("✅ البوت يعمل...")
+print("✅ البوت يعمل الآن...")
 bot.polling(none_stop=True, interval=0, timeout=20)
