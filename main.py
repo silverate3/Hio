@@ -3,6 +3,9 @@ import json
 import webbrowser
 import telebot
 from telebot import types
+import time
+import threading
+
 
 
 
@@ -57,6 +60,31 @@ def check_user_subscription(user_id):
             member = bot.get_chat_member(channel_id, user_id)
             if member.status not in ['member', 'creator', 'administrator']:
                 return False, channel_info
+                def animated_welcome(chat_id, user_name, markup):
+    frames = [
+        "🌑 جاري تحميل البوت...",
+        "🌒 جاري تحميل البوت...",
+        "🌓 جاري تحميل البوت...",
+        "🌔 جاري تحميل البوت...",
+        "🌕 اكتمل التحميل!",
+    ]
+    msg = bot.send_message(chat_id, frames[0])
+    for frame in frames[1:]:
+        time.sleep(0.6)
+        bot.edit_message_text(chat_id=chat_id, message_id=msg.message_id, text=frame)
+    time.sleep(0.5)
+    bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=msg.message_id,
+        text=(
+            f"🎉 أهلاً وسهلاً {user_name}!\n\n"
+            f"✨ يسعدنا انضمامك لبوت معرفة اسم الرقم\n\n"
+            f"📞 ابحث عن اسم أي رقم حول العالم!\n\n"
+            f"👇 اضغط على البحث للبدء"
+        ),
+        reply_markup=markup
+    )
+
         except Exception:
             return False, channel_info
     return True, None
@@ -88,11 +116,18 @@ def handle_start(message):
         user_states[user_id] = 'awaiting_subscription_check'
         return
 
-    bot.send_message(
-        message.chat.id,
-        f"اهلا عزيزي {user_name} في بوت معرفه اسمه الرقم -",
-        reply_markup=get_main_inline_keyboard()
-    )
+        if is_new_user:
+        t = threading.Thread(target=animated_welcome, args=(message.chat.id, user_name, get_main_inline_keyboard()))
+        t.start()
+    else:
+        bot.send_message(
+            message.chat.id,
+            f"👋 مرحباً {user_name}!\n\n👇 اضغط على البحث للبدء",
+            reply_markup=get_main_inline_keyboard()
+        )
+    if user_id in user_states:
+        del user_states[user_id]
+
     if user_id in user_states:
         del user_states[user_id]
 
