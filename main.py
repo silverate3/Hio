@@ -198,33 +198,48 @@ def search_instagram(username):
     username = username.strip()
 
     headers = {
-        'user-agent': 'Mozilla/5.0',
-        'x-csrftoken': 'kj0osUm9Cc2q2dmLQk3CcSRpOxMLAgIE',
-        'x-ig-app-id': '936619743392459',
-        'x-requested-with': 'XMLHttpRequest',
+        "accept": "*/*",
+        "accept-language": "ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+        "sec-ch-prefers-color-scheme": "dark",
+        "sec-ch-ua": "\"Chromium\";v=\"139\", \"Not;A=Brand\";v=\"99\"",
+        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"139.0.7339.0\", \"Not;A=Brand\";v=\"99.0.0.0\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-model": "\"\"",
+        "sec-ch-ua-platform": "\"Linux\"",
+        "sec-ch-ua-platform-version": "\"\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "x-asbd-id": "359341",
+        "x-ig-app-id": "936619743392459",
+        "x-ig-www-claim": "0",
+        "x-requested-with": "XMLHttpRequest",
     }
 
     try:
-        r = requests.get(
-            'https://www.instagram.com/api/v1/users/web_profile_info/',
-            params={'username': username},
-            headers=headers,
-            timeout=12
-        )
-        if r.status_code == 200:
-            d = r.json()['data']['user']
-            return {
-                'full_name': d.get('full_name') or username,
-                'username': d.get('username', username),
-                'bio': (d.get('biography') or 'لا يوجد')[:200],
-                'followers': f"{d['edge_followed_by']['count']:,}",
-                'following': f"{d['edge_follow']['count']:,}",
-                'posts': f"{d['edge_owner_to_timeline_media']['count']:,}",
-                'is_private': '🔒 خاص' if d.get('is_private') else '🌐 عام',
-                'is_verified': '✅ موثق' if d.get('is_verified') else '❌ غير موثق',
-                'category': d.get('category_name') or '',
-                'external_url': d.get('external_url') or '',
-            }
+        url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}"
+        r = requests.get(url, headers=headers, timeout=12)
+        data = r.json()
+
+        if data.get("status") != "ok" or "data" not in data or "user" not in data["data"]:
+            return None
+
+        u = data["data"]["user"]
+        return {
+            'full_name': u.get('full_name') or username,
+            'username': u.get('username', username),
+            'id': u.get('id', ''),
+            'bio': (u.get('biography') or 'لا يوجد')[:200],
+            'followers': f"{u.get('edge_followed_by', {}).get('count', 0):,}",
+            'following': f"{u.get('edge_follow', {}).get('count', 0):,}",
+            'posts': f"{u.get('edge_owner_to_timeline_media', {}).get('count', 0):,}",
+            'highlights': u.get('highlight_reel_count', 0),
+            'has_clips': u.get('has_clips', False),
+            'is_private': '🔒 خاص' if u.get('is_private') else '🌐 عام',
+            'is_verified': '✅ موثق' if u.get('is_verified') else '❌ غير موثق',
+            'category': u.get('category_name') or '',
+            'external_url': u.get('external_url') or '',
+        }
     except Exception:
         pass
 
@@ -597,17 +612,20 @@ def handle_search_input(message):
             if r:
                 text = (f"📸 <b>نتيجة انستقرام</b>\n{'─'*22}\n"
                         f"👤 <b>الاسم:</b> {r['full_name']}\n"
-                        f"🔗 <b>المعرف:</b> @{r['username']}\n")
+                        f"🔗 <b>المعرف:</b> @{r['username']}\n"
+                        f"🆔 <b>الآيدي:</b> <code>{r.get('id','')}</code>\n")
                 if r.get('category'):
                     text += f"🏷 <b>الفئة:</b> {r['category']}\n"
                 text += (f"📝 <b>البايو:</b> {r['bio'] or 'لا يوجد'}\n"
                          f"👥 <b>المتابعون:</b> {r['followers']}\n"
                          f"➡️ <b>يتابع:</b> {r['following']}\n"
                          f"🖼 <b>المنشورات:</b> {r['posts']}\n"
+                         f"🔦 <b>الهايلايت:</b> {r.get('highlights', 0)}\n"
+                         f"🎬 <b>ريلز:</b> {'✅' if r.get('has_clips') else '❌'}\n"
                          f"🔐 <b>الحساب:</b> {r['is_private']}\n"
                          f"✅ <b>التوثيق:</b> {r['is_verified']}\n")
                 if r.get('external_url'):
-                    text += f"🔗 <b>الموقع:</b> {r['external_url']}\n"
+                    text += f"🌐 <b>الموقع:</b> {r['external_url']}\n"
                 return text, get_result_keyboard(f"https://instagram.com/{r['username']}")
             return (f"❌ <b>لم يتم العثور على الحساب</b>\n\n"
                     f"تأكد من اسم المستخدم: <code>@{username}</code>"), get_back_keyboard()
