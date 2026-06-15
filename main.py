@@ -193,80 +193,38 @@ def search_phone_number(phone):
 # ==================== خدمة 2: انستقرام ====================
 
 def search_instagram(username):
-    username = username.strip().lstrip('@')
+    if "@" in username:
+        username = username.split("@")[0]
+    username = username.strip()
 
-    sessions = [
-        {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-            'x-ig-app-id': '936619743392459',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': f'https://www.instagram.com/{username}/',
-            'Origin': 'https://www.instagram.com',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-origin',
-        },
-        {
-            'User-Agent': 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)',
-            'x-ig-app-id': '567067343352427',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US',
-        }
-    ]
+    headers = {
+        'user-agent': 'Mozilla/5.0',
+        'x-csrftoken': 'kj0osUm9Cc2q2dmLQk3CcSRpOxMLAgIE',
+        'x-ig-app-id': '936619743392459',
+        'x-requested-with': 'XMLHttpRequest',
+    }
 
-    for headers in sessions:
-        try:
-            r = requests.get(
-                f"https://www.instagram.com/api/v1/users/web_profile_info/?username={username}",
-                headers=headers,
-                timeout=12
-            )
-            if r.status_code == 200:
-                d = r.json()
-                u = d.get('data', {}).get('user', {})
-                if u and u.get('id'):
-                    return {
-                        'full_name': u.get('full_name') or username,
-                        'username': u.get('username', username),
-                        'bio': (u.get('biography') or 'لا يوجد')[:200],
-                        'followers': f"{u.get('edge_followed_by', {}).get('count', 0):,}",
-                        'following': f"{u.get('edge_follow', {}).get('count', 0):,}",
-                        'posts': f"{u.get('edge_owner_to_timeline_media', {}).get('count', 0):,}",
-                        'is_private': '🔒 خاص' if u.get('is_private') else '🌐 عام',
-                        'is_verified': '✅ موثق' if u.get('is_verified') else '❌ غير موثق',
-                        'category': u.get('category_name') or '',
-                        'external_url': u.get('external_url') or '',
-                    }
-        except Exception:
-            continue
-
-    # محاولة Picuki
     try:
         r = requests.get(
-            f"https://www.picuki.com/profile/{username}",
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'},
-            timeout=10
+            'https://www.instagram.com/api/v1/users/web_profile_info/',
+            params={'username': username},
+            headers=headers,
+            timeout=12
         )
         if r.status_code == 200:
-            text = r.text
-            name_m = re.search(r'<h1[^>]*>([^<]+)<', text)
-            followers_m = re.search(r'([\d,]+)\s*Followers', text)
-            following_m = re.search(r'([\d,]+)\s*Following', text)
-            posts_m = re.search(r'([\d,]+)\s*Posts', text)
-            if name_m:
-                return {
-                    'full_name': name_m.group(1).strip(),
-                    'username': username,
-                    'bio': '',
-                    'followers': followers_m.group(1) if followers_m else 'غير محدد',
-                    'following': following_m.group(1) if following_m else 'غير محدد',
-                    'posts': posts_m.group(1) if posts_m else 'غير محدد',
-                    'is_private': '❓',
-                    'is_verified': '❓',
-                    'category': '',
-                    'external_url': '',
-                }
+            d = r.json()['data']['user']
+            return {
+                'full_name': d.get('full_name') or username,
+                'username': d.get('username', username),
+                'bio': (d.get('biography') or 'لا يوجد')[:200],
+                'followers': f"{d['edge_followed_by']['count']:,}",
+                'following': f"{d['edge_follow']['count']:,}",
+                'posts': f"{d['edge_owner_to_timeline_media']['count']:,}",
+                'is_private': '🔒 خاص' if d.get('is_private') else '🌐 عام',
+                'is_verified': '✅ موثق' if d.get('is_verified') else '❌ غير موثق',
+                'category': d.get('category_name') or '',
+                'external_url': d.get('external_url') or '',
+            }
     except Exception:
         pass
 
