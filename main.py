@@ -6,8 +6,9 @@ from telebot import types
 
 
 
-BOT_TOKEN = input('384366955:AAFJdzI2untoSFoVTd_YSt79Uc7DCkwMbR4')
-OWNER_ID = int(input('256156772'))
+BOT_TOKEN = '384366955:AAFJdzI2untoSFoVTd_YSt79Uc7DCkwMbR4'
+OWNER_ID = 256156772
+
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode='HTML')
 
