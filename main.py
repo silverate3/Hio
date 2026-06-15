@@ -26,15 +26,9 @@ def get_main_inline_keyboard():
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton('📞 بحث برقم الهاتف', callback_data='search_phone'))
     markup.row(
-        types.InlineKeyboardButton('📸 انستقرام', callback_data='search_instagram'),
-        types.InlineKeyboardButton('🎵 تيك توك', callback_data='search_tiktok')
-    )
+        types.InlineKeyboardButton('📧 بحث ايميل', callback_data='search_email'))
     markup.row(
-        types.InlineKeyboardButton('📧 بحث ايميل', callback_data='search_email'),
-        types.InlineKeyboardButton('🌐 معلومات موقع', callback_data='search_domain')
-    )
-    markup.row(
-        types.InlineKeyboardButton('👨‍💻 المطور', url='https://t.me/BBBBYB2'),
+        types.InlineKeyboardButton('👨‍💻 المطور', url='https://t.me/e77_ee'),
         types.InlineKeyboardButton('❓ المساعدة', callback_data='show_help_menu')
     )
     return markup
