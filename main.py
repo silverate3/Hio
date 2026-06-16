@@ -700,8 +700,6 @@ def cb_help(call):
               "📞 <b>رقم الهاتف:</b>\n"
               "   <code>07701234567</code> عراقي مباشر\n"
               "   <code>+9647701234567</code> مع رمز الدولة\n\n"
-              "📸 <b>انستقرام / 🎵 تيك توك:</b>\n"
-              "   أرسل اسم المستخدم: <code>cristiano</code>\n\n"
               "📧 <b>ايميل:</b>\n"
               "   <code>example@gmail.com</code>\n\n"
               "🌐 <b>موقع:</b>\n"
